@@ -29,6 +29,12 @@ void convert(int fr, int to, Data* valv, int valc);
 void itoa(int val, char* dest, int str_size, int radix);
 
 
+/**
+ * Program to change the base of a list of numbers from base {2..36} to base {2..36}
+ * Usage:
+ *  ./program -i input_base -o output_base value [value ...]
+ *  The tags -i and -o are required!
+ *  You must provide at least one value to convert!
 int main(int argc, char ** argv){
     int option = 0;
     int fr = -1;
@@ -91,6 +97,12 @@ int main(int argc, char ** argv){
     return 0;
 }
 
+
+/**
+ * Takes in an array of type Data (int and char* union) 
+ * and rewrites each value in the array to represent its value
+ * in the requested base
+ */
 void convert(int fr, int to, Data* valv, int valc){
     // Just in case input and output base are the same
     if(fr == to)
