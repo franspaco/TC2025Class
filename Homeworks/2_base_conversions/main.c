@@ -35,6 +35,7 @@ void itoa(int val, char* dest, int str_size, int radix);
  *  ./program -i input_base -o output_base value [value ...]
  *  The tags -i and -o are required!
  *  You must provide at least one value to convert!
+ */
 int main(int argc, char ** argv){
     int option = 0;
     int fr = -1;
