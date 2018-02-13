@@ -21,6 +21,10 @@ int main(int argc, char** argv){
     ppm_t* img3 = ppm_rotate(img, d180);
     ppm_t* img4 = ppm_rotate(img, d270);
 
+    ppm_writeFile("rot090d.ppm", img2, BINARY);
+    ppm_writeFile("rot180d.ppm", img3, BINARY);
+    ppm_writeFile("rot270d.ppm", img4, BINARY);
+
     printf("\nRoated: 90°\n");
     ppm_print(img2);
 
