@@ -1,4 +1,9 @@
 
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
 
 #ifndef VIGENERE_WORKER_H
 #define VIGENERE_WORKER_H
