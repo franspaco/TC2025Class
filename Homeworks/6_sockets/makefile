@@ -3,12 +3,15 @@
 ### Variables for this project ###
 # These should be the only ones that need to be modified
 # The files that must be compiled, with a .o extension
-OBJECTS = get_pi.o fatal_error.o
+OBJECTS = fatal_error.o blackjack.o
 # The header files
-DEPENDS = get_pi.h fatal_error.h
+DEPENDS = fatal_error.h blackjack.h
 # The executable programs to be created
-CLIENT = pi_client
-SERVER = pi_server
+CLIENT = blackjack_s
+SERVER = blackjack_c
+
+# Folder to sabe objects to
+OBJDIR = temp_build/
 
 ### Variables for the compilation rules ###
 # These should work for most projects, but can be modified when necessary
@@ -26,7 +29,8 @@ LDLIBS = -lm
 # These should work for most projects without change
 
 # Default rule
-all: $(CLIENT) $(SERVER) $(TEST)
+all: $(CLIENT) $(SERVER)
+
 
 # Rule to make the client program
 $(CLIENT): $(CLIENT).o $(OBJECTS)
@@ -40,9 +44,11 @@ $(SERVER): $(SERVER).o $(OBJECTS)
 %.o: %.c $(DEPENDS)
 	$(CC) $< -c -o $@ $(CFLAGS)
 
+rebuild: clean all
+
 # Clear the compiled files
 clean:
-	rm -rf *.o $(CLIENT) $(SERVER) $(TEST)
+	rm -rf *.o $(CLIENT) $(SERVER)
 	
 # Indicate the rules that do not refer to a file
 .PHONY: clean all

@@ -17,7 +17,6 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 // Custom libraries
-#include "get_pi.h"
 #include "fatal_error.h"
 
 #include <ifaddrs.h>
@@ -37,7 +36,7 @@ int main(int argc, char * argv[])
 {
     int server_fd;
 
-    printf("\n=== SERVER FOR COMPUTING THE VALUE OF pi ===\n");
+    printf("\n=== BLACKJACK SERVER ===\n");
 
     // Check the correct arguments
     if (argc != 2)
@@ -178,7 +177,6 @@ void waitForConnections(int server_fd)
     socklen_t client_address_size;
     char client_presentation[INET_ADDRSTRLEN];
     int client_fd;
-    pid_t new_pid;
 
     // Get the size of the structure to store client information
     client_address_size = sizeof client_address;
@@ -252,7 +250,7 @@ void attendRequest(int client_fd)
 
     printf("[INFO] [%i] Got request from client with iterations=%lu\n", getpid(), iterations);
 
-    result = computePI(iterations);
+    result = 3.14159;
 
     // SEND
     // Write back the reply
