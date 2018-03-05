@@ -3,9 +3,9 @@
 ### Variables for this project ###
 # These should be the only ones that need to be modified
 # The files that must be compiled, with a .o extension
-OBJECTS = fatal_error.o blackjack.o
+OBJECTS = fatal_error.o blackjack.o bj_comms.o
 # The header files
-DEPENDS = fatal_error.h blackjack.h
+DEPENDS = fatal_error.h blackjack.h bj_comms.h
 # The executable programs to be created
 CLIENT = blackjack_s
 SERVER = blackjack_c

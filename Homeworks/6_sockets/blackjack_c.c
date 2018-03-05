@@ -16,6 +16,8 @@
 #include <arpa/inet.h>
 // Custom libraries
 #include "fatal_error.h"
+#include "blackjack.h"
+#include "bj_comms.h"
 
 #include <ifaddrs.h>
 
@@ -24,14 +26,25 @@
 ///// FUNCTION DECLARATIONS
 void usage(char * program);
 int openSocket(char * address, char * port);
-void requestPI(int connection_fd);
+
+void startGame(int connection_fd);
+int doAction(int connection_fd, int code, int data, hand_t* hand);
+
+
+void myflush ( FILE *in ){
+    int ch;
+    do
+        ch = fgetc ( in ); 
+    while ( ch != EOF && ch != '\n' ); 
+    clearerr ( in );
+}
 
 ///// MAIN FUNCTION
 int main(int argc, char * argv[])
 {
     int connection_fd;
 
-    printf("\n=== CLIENT FOR COMPUTING THE VALUE OF pi ===\n");
+    printf("\n=== Blackjack client ===\n");
 
     // Check the correct arguments
     if (argc != 3)
@@ -39,10 +52,11 @@ int main(int argc, char * argv[])
         usage(argv[0]);
     }
 
-    // Start the server
+    // Start the connection
     connection_fd = openSocket(argv[1], argv[2]);
-	// Listen for connections from the clients
-    requestPI(connection_fd);
+	
+    startGame(connection_fd);
+
     // Close the socket
     close(connection_fd);
 
@@ -111,38 +125,130 @@ int openSocket(char * address, char * port)
     return connection_fd;
 }
 
-void requestPI(int connection_fd)
-{
-    char buffer[BUFFER_SIZE];
-    int chars_read;
-    unsigned long int iterations;
-    double result;
+void startGame(int connection_fd){
+    printf("Enter your bet: (int)\n");
+    int bet;
+    scanf("%i", &bet);
+    sendCodeTrailer(connection_fd, NEW, bet);
+    hand_t hand;
+    hand.num = 0;
+    hand.sum = 0;
 
-    printf("Enter the number of iterations for PI: ");
-    scanf("%lu", &iterations);
+    while(1){
+        int code;
+        int data;
+        int bytes_read = awaitResponse(connection_fd, &code, &data);
 
-    // Prepare the request to the server
-    sprintf(buffer, "%lu\n", iterations);
-    
-    // SEND
-    // Send the response
-    if (send(connection_fd, buffer, strlen(buffer) + 1, 0) == -1 )
-    {
-        fatalError("send");
+        if(bytes_read == -1 || bytes_read == 0){
+            fatalError("Receive!\n");
+        }
+
+        // Must return 1 to keep in game, 0 to quit.
+        if(!doAction(connection_fd, code, data, &hand)){
+            return;
+        }
+
     }
 
-    // Clear the buffer
-    bzero(&buffer, BUFFER_SIZE);
+    sendCode(connection_fd, QUIT);
+}
 
-    // RECV
-    // Receive the request
-    chars_read = recv(connection_fd, buffer, BUFFER_SIZE, 0);
-    if (chars_read == -1)
-    {
-        fatalError("recv");
+void printHand(hand_t* hand){
+    printf("Your hand has %i cards:\n", hand->num);
+    for(int i = 0; i < hand->num; i++){
+        printf(" %i", hand->cards[i]);
     }
+    printf("\nSum: %i\n", hand->sum);
+}
 
-    sscanf(buffer, "%lf", &result);
-    // Print the result
-    printf("The value for PI is: %.20lf\n", result);
+
+int doAction(int connection_fd, int code, int data, hand_t* hand){
+    switch(code){
+        case DEAL:
+            if(data == -1){
+                printf("Oh no!\nYou asked for too many cards!\n");
+                return 0;
+            }
+            printf("The dealer has given you a: %i\n", data);
+            hand->cards[hand->num++] = data;
+            hand->sum += data;
+            printHand(hand);
+
+            if(hand->sum > 21){
+                printf("Oh no!\n YOU LOST!!\n");
+                sendCode(connection_fd, LOST);
+                return 0;
+            }
+
+            if(hand->num == 1){
+                sendCode(connection_fd, HIT);
+                return 1;
+            }
+            sendCode(connection_fd, INQUIRY_DEALER);
+            return 1;
+        case DEALER_ACTION:
+            if(data == 0){
+                printf("Dealer took a secret card!\n");
+            }
+            else {
+                printf("Dealer drew a %i\n", data);
+            }
+        case DEALER_READY:
+            printf("Dealer did nothing more.\n");
+            printf("Do you wish to hit, stand or quit game? (h/s/q)\n");
+            char opt;
+            scanf("\n%c", &opt);
+            //printf("USER INPUT IS: %i\n", opt);
+            if(opt == 'h' || opt == 'H'){
+                printf("You've chosen to: HIT\n");
+                sendCode(connection_fd, HIT);
+            }
+            else if(opt == 's' || opt == 'S'){
+                printf("You've chosen to: STAND\n");
+                sendCode(connection_fd, STAND);
+
+            }
+            else if(opt == 'q' || opt == 'Q'){
+                printf("Quitting game!\n");
+                return 0;
+            }
+            else{
+                printf("Invalid option!!\n");
+                sendCode(connection_fd, QUIT);
+                fatalError("USER");
+            }
+            return 1;
+        case DEALING_FINISHED:
+            if(data > 0){
+                // PLAYER WINS
+                printf("YOU WON!\n");
+            }
+            else if(data < 0){
+                // DEALER WINS
+                printf("YOU LOST!\n");
+            }
+            else {
+                // TIE
+                printf("YOU IT's A TIE!\n");
+            }
+            printHand(hand);
+            sendCode(connection_fd, GET_DEALER_CARDS);
+            return 1;
+        case READY_TO_SEND_CARDS:
+            sendCode(connection_fd, NEXT_CARD);
+            printf("Dealer has: \n");
+            return 1;
+        case DEALER_CARD:
+            printf(" %i", data);
+            sendCode(connection_fd, NEXT_CARD);
+            return 1;
+        case DEALER_DONE:
+            printf("\n");
+            return 0;
+        case QUIT:
+            return 0;
+        default:
+            fatalError("CODE");
+    }
+    return 0;
 }
