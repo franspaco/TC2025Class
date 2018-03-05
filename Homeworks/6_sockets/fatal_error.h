@@ -1,3 +1,9 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
+
 #ifndef FATAL_ERROR_H
 #define FATAL_ERROR_H
 

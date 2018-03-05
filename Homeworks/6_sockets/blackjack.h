@@ -1,4 +1,8 @@
-
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
 
 #ifndef BLACKJACK_H
 #define BLACKJACK_H

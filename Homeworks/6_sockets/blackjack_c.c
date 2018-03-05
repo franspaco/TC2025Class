@@ -1,11 +1,8 @@
-/*
-    Client program to get the value of PI
-    This program connects to the server using sockets
-
-    Gilberto Echeverria
-    gilecheverria@yahoo.com
-    21/02/2018
-*/
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,13 +1,8 @@
-/*
-    Server program to compute the value of PI
-    This program calls the library function 'get_pi'
-    It will create child processes to attend requests
-    It receives connections using sockets
-
-    Gilberto Echeverria
-    gilecheverria@yahoo.com
-    21/02/2018
-*/
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
