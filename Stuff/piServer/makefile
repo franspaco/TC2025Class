@@ -9,7 +9,6 @@ DEPENDS = get_pi.h fatal_error.h
 # The executable programs to be created
 CLIENT = pi_client
 SERVER = pi_server
-TEST = test_pi
 
 ### Variables for the compilation rules ###
 # These should work for most projects, but can be modified when necessary
@@ -37,9 +36,6 @@ $(CLIENT): $(CLIENT).o $(OBJECTS)
 $(SERVER): $(SERVER).o $(OBJECTS)
 	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-# Rule to make the server program
-$(TEST): $(TEST).o $(OBJECTS)
-	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # Rule to make the object files
 %.o: %.c $(DEPENDS)
