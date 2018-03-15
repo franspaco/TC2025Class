@@ -1,24 +1,21 @@
-/*
-    Server program to compute the value of PI
-    This program calls the library function 'get_pi'
-    It will create child processes to attend requests
-    It receives connections using sockets
-
-    Gilberto Echeverria
-    gilecheverria@yahoo.com
-    21/02/2018
-*/
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 // Sockets libraries
 #include <netdb.h>
 #include <arpa/inet.h>
 // Custom libraries
-#include "get_pi.h"
 #include "fatal_error.h"
+#include "blackjack.h"
+#include "bj_comms.h"
 
 #include <ifaddrs.h>
 
@@ -32,12 +29,14 @@ int initServer(char * port);
 void waitForConnections(int server_fd);
 void attendRequest(int client_fd);
 
+void startGame(int client_fd);
+int doAction(int connection_fd, int code, int data, hand_t* hand, hand_t* dealer);
+
 ///// MAIN FUNCTION
-int main(int argc, char * argv[])
-{
+int main(int argc, char * argv[]){
     int server_fd;
 
-    printf("\n=== SERVER FOR COMPUTING THE VALUE OF pi ===\n");
+    printf("\n=== BLACKJACK SERVER ===\n");
 
     // Check the correct arguments
     if (argc != 2)
@@ -178,7 +177,6 @@ void waitForConnections(int server_fd)
     socklen_t client_address_size;
     char client_presentation[INET_ADDRSTRLEN];
     int client_fd;
-    pid_t new_pid;
 
     // Get the size of the structure to store client information
     client_address_size = sizeof client_address;
@@ -208,7 +206,8 @@ void waitForConnections(int server_fd)
         }
         else if(pid == 0){
             // Child
-            attendRequest(client_fd);
+            //attendRequest(client_fd);
+            startGame(client_fd);
             printf("[INFO] [%i] shutting down!\n", getpid());
             exit(0);
             printf("NEVER PRINTS\n");
@@ -220,6 +219,135 @@ void waitForConnections(int server_fd)
        
     }
 }
+
+
+void startGame(int client_fd){
+    int code = -1, data = -1;
+    char buffer[BUFFER_SIZE];
+
+    int bytes_read;
+
+    hand_t hand;
+    hand.num = 0;
+    hand.sum = 0;
+
+    hand_t dealer;
+    dealer.num = 0;
+    dealer.sum = 0;
+
+    while(1){
+        // Clear the buffer to avoid errors
+        bzero(&buffer, BUFFER_SIZE);
+
+        bytes_read = awaitResponse(client_fd, &code, &data);
+
+        if(bytes_read == 0){
+            printf("[INFO] [%i] Client disconnected\n", getpid());
+            return;
+        }
+        if (bytes_read == -1)
+        {
+            printf("[ERROR] [%i] Client receive error\n", getpid());
+            return;
+        }
+
+        printf("[INFO] [%i] Client sent: %i %i\n", getpid(), code, data);
+
+        // Do the thing
+        if(!doAction(client_fd, code, data, &hand, &dealer)){
+            printf("[INFO] [%i] Client disconnected\n", getpid());
+            return;
+        }
+    }
+}
+
+int dealerPlay(hand_t* dealer){
+    if(dealer->sum < 17){
+        int card = rand() % 9 + 1;
+        dealer->cards[dealer->num++] = card;
+        dealer->sum += card;
+        if(dealer->num > 1){
+            return 0;
+        }
+        else{
+            return card;
+        }
+    }
+    return -1;
+}
+
+int card_index = 0;
+
+// Does the required action
+// Returns 1 to continue cycle
+// Returns 0 to quit cycle
+int doAction(int connection_fd, int code, int data, hand_t* hand, hand_t* dealer){
+    srand(time(NULL));
+    switch(code){
+        case NEW:
+            hand->bet = data;
+        case HIT:
+            if(hand->num == HAND_SIZE){
+                sendCodeTrailer(connection_fd, DEAL, -1);
+                return 0;
+            }
+            int card = rand() % 9 + 1;
+            sendCodeTrailer(connection_fd, DEAL, card);
+            hand->cards[hand->num++] = card;
+            hand->sum += card;
+            return 1;
+        case INQUIRY_DEALER:
+            ;
+            int dealer_played = dealerPlay(dealer);
+            if(dealer_played >= 0){
+                sendCodeTrailer(connection_fd, DEALER_ACTION, dealer_played);
+            }
+            else{
+                sendCode(connection_fd, DEALER_READY);
+            }
+            return 1;
+        case STAND:
+            while(dealerPlay(dealer) != -1){}
+
+            hand->sum = abs(21 - hand->sum);
+            dealer->sum = abs(21 - dealer->sum);
+
+            if(hand->sum < dealer->sum){
+                // PLAYER WINS
+                sendCodeTrailer(connection_fd, DEALING_FINISHED, 1);
+            }
+            else if(hand->sum < dealer->sum){
+                // DEALER WINS
+                sendCodeTrailer(connection_fd, DEALING_FINISHED, -1);
+            }
+            else{
+                // TIE
+                sendCodeTrailer(connection_fd, DEALING_FINISHED, 0);
+            }
+            return 1;
+        case GET_DEALER_CARDS:
+            card_index = 0;
+            sendCode(connection_fd, READY_TO_SEND_CARDS);
+            return 1;
+        case NEXT_CARD:
+            if(card_index < dealer->num){
+                sendCodeTrailer(connection_fd, DEALER_CARD, dealer->cards[card_index++]);
+            }
+            else{
+                sendCode(connection_fd, DEALER_DONE);
+            }
+            return 1;
+        case LOST:
+        printf("[INFO] [%i] Client lost! Received bet of $%i\n", getpid(), hand->bet);
+            return 0;
+        case QUIT:
+            return 0;
+        default:
+            printf("[ERROR] [%i] Client sent unexpected code\n", getpid());
+            return 0;
+    }
+}
+
 
 /*
     Hear the request from the client and send an answer
@@ -252,7 +380,7 @@ void attendRequest(int client_fd)
 
     printf("[INFO] [%i] Got request from client with iterations=%lu\n", getpid(), iterations);
 
-    result = computePI(iterations);
+    result = 3.14159;
 
     // SEND
     // Write back the reply
