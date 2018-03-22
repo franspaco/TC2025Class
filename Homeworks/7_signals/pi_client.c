@@ -1,3 +1,10 @@
+
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
+
 /*
     Client program to get the value of PI
     This program connects to the server using sockets

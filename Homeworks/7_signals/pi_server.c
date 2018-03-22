@@ -1,3 +1,9 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
+
 /*
     Server program to compute the value of PI
     This program calls the library function 'get_pi'
