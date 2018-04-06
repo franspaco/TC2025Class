@@ -1,5 +1,9 @@
 {
     "files.associations": {
-        "fatal_error.h": "c"
+        "fatal_error.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "signal.h": "c",
+        "unistd.h": "c"
     }
 }
