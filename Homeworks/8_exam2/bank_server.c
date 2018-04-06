@@ -244,8 +244,9 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 /*
     Hear the request from the client and send an answer
 */
-void * attentionThread(void * arg)
-{
+void * attentionThread(void * arg) {
+
+    printf("[INFO] Attending request!");
     // Receive the data for the bank, mutexes and socket file descriptor
 
     // Loop to listen for messages from the client

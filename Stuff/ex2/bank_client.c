@@ -73,8 +73,7 @@ void bankOperations(int connection_fd)
     int status;
     operation_t operation;
 
-    while (option != 'x')
-    {
+    while (option != 'x'){
         printf("Bank menu:\n");
         printf("\tc. Check balance\n");
         printf("\td. Deposit into account\n");
@@ -108,7 +107,7 @@ void bankOperations(int connection_fd)
             case 'w':
                 printf("Enter account: ");
                 scanf("%d", &account);
-                printf("Enter the amount to deposit: ");
+                printf("Enter the amount to withdraw: ");
                 scanf("%f", &amount);
                 operation = WITHDRAW;
                 break;

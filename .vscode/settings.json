@@ -1,6 +1,8 @@
 {
     "files.associations": {
-        "fatal_error.h": "c"
+        "fatal_error.h": "c",
+        "server_utils.h": "c",
+        "ifaddrs.h": "c"
     },
     "python.pythonPath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\Python36_64\\python.exe"
 }
