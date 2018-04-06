@@ -1,3 +1,10 @@
+
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
+
 /*
     Client program to get the value of PI
     This program connects to the server using sockets
@@ -25,6 +32,8 @@
 #define BUFFER_SIZE 1024
 
 int exit_flag = 0;
+int awaiting_reply = 0;
+int connection_fd_status = -1;
 
 ///// FUNCTION DECLARATIONS
 void usage(char * program);
@@ -49,6 +58,10 @@ int main(int argc, char * argv[]){
 
     // Start the server
     connection_fd = openSocket(argv[1], argv[2]);
+
+    // Overwrite the server_fd_status with the server_fd so it can be closed on quit
+    connection_fd_status = connection_fd;
+
 	// Listen for connections from the clients
     requestPI(connection_fd);
     // Close the socket
@@ -71,6 +84,15 @@ void usage(char * program) {
 void exitHandler(int sig){
     printf("\nQUITTING!\n");
     exit_flag = 1;
+    if(awaiting_reply == 0){
+        // The client is not currently awaiting for a response
+        //   e.g. is currently waiting in the scanf
+        if(connection_fd_status != -1){
+            // Close the connection that was left open
+            close(connection_fd_status);
+        }
+        exit(0);
+    }
 }
 
 /*
@@ -140,6 +162,7 @@ void requestPI(int connection_fd) {
     if (send(connection_fd, buffer, strlen(buffer) + 1, 0) == -1 ) {
         fatalError("send");
     }
+    awaiting_reply = 1;
     
     while (1) {
         // POLL
@@ -153,7 +176,7 @@ void requestPI(int connection_fd) {
             // SIGINT will trigger this, we should ask the server for the current value of pi
             //  and break out of the while-loop to receive it
             // errno is checked to make sure it was a signal that got us here and not an error
-            if(errno == EINTR){
+            if(errno == EINTR && exit_flag){
                 // An exit signal got us here, therefore we must request the current value and break
                 requestQuit(connection_fd);
                 break;

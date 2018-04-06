@@ -1,3 +1,9 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ * 
+ */
+
 /*
     Server program to compute the value of PI
     This program calls the library function 'get_pi'
@@ -31,6 +37,7 @@
 
 int exit_flag = 0;
 int attending_request = 0;
+int server_fd_status = -1;
 
 ///// FUNCTION DECLARATIONS
 void usage(char * program);
@@ -60,6 +67,10 @@ int main(int argc, char * argv[]) {
 
     // Start the server
     server_fd = initServer(argv[1]);
+
+    // Overwrite the server_fd_status with the server_fd so it can be closed on quit
+    server_fd_status = server_fd;
+
 	// Listen for connections from the clients
     waitForConnections(server_fd);
     // Close the socket
@@ -89,6 +100,10 @@ void exitHandler(int sig){
         // This will kill any process that is not directly dealing with 
         //   a client, namely the parent process, and therefore has 
         //   nothing else to do.
+        if(server_fd_status != -1){
+            printf("Closing server socket\n");
+            close(server_fd_status);
+        }
         exit(0);
     }
 }
@@ -206,13 +221,13 @@ void waitForConnections(int server_fd)
     // Get the size of the structure to store client information
     client_address_size = sizeof client_address;
 
-    while (1)
+    while (!exit_flag)
     {
         // ACCEPT
         // Wait for a client connection
         client_fd = accept(server_fd, (struct sockaddr *) &client_address, &client_address_size);
-        if (client_fd == -1)
-        {
+        
+        if (client_fd == -1) {
             fatalError("accept");
         }
         
@@ -265,7 +280,7 @@ void attendRequest(int client_fd) {
     chars_read = recv(client_fd, buffer, BUFFER_SIZE, 0);
     if (chars_read == 0)
     {
-        printf("Client disconnected");
+        printf("Client disconnected\n");
         return;
     }
     if (chars_read == -1)
@@ -292,7 +307,7 @@ void attendRequest(int client_fd) {
     int sign = -1;
     unsigned long int divisor = 3;
 
-    while (1) {
+    while (!exit_flag) {
         // POLL
         // Fill in the data for the structure
         test_fds[0].fd = client_fd;
@@ -304,7 +319,7 @@ void attendRequest(int client_fd) {
             // SIGINT will trigger this, to return the current value we just need to break
             // out of the while-loop
             // errno is checked to make sure it was a signal that got us here and not an error
-            if(errno == EINTR){
+            if(errno == EINTR && exit_flag){
                 // An exit signal got us here, therefore we must break to return pi
                 break;
             }
