@@ -1,3 +1,8 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ */
+
 /*
     Client program to access the accounts in the bank
     This program connects to the server using sockets

@@ -1,3 +1,7 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ */
 
 #ifndef BANK_CODES_H
 #define BANK_CODES_H
@@ -16,8 +20,7 @@ typedef enum valid_responses {
     INSUFFICIENT,
     NO_ACCOUNT,
     BYE,
-    ERROR,
-    CLOSED
+    ERROR
 } response_t;
 
 #endif

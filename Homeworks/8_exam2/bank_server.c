@@ -1,3 +1,8 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ */
+
 /*
     Program for a simple bank server
     It uses sockets and threads
