@@ -16,7 +16,8 @@ typedef enum valid_responses {
     INSUFFICIENT,
     NO_ACCOUNT,
     BYE,
-    ERROR
+    ERROR,
+    CLOSED
 } response_t;
 
 #endif

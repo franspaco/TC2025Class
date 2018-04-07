@@ -252,6 +252,8 @@ void * attentionThread(void * arg) {
     struct pollfd test_fds[1];
     int timeout = 10; // 10ms tiemout
     int poll_result;
+
+    // buffer
     char buffer[BUFFER_SIZE];
 
     //Account stuff
@@ -312,26 +314,33 @@ void * attentionThread(void * arg) {
 
             switch(msg.op){
                 case CHECK:
+                    // Get balance
                     balance = getBalance(data, msg.account);
                     break;
                 case DEPOSIT:
+                    // Make sure value is valid
                     if(msg.value < 0){
                         sendResponse(data->fd, ERROR, 0);
                         continue;
                     }
+                    // Make deposit
                     balance = depositToAccount(data, msg.account, msg.value);
                     break;
                 case WITHDRAW:
+                    // Make sure value is valid
                     if(msg.value < 0){
                         sendResponse(data->fd, ERROR, 0);
                         continue;
                     }
+                    // Try widthraw
                     withrawFromAccount(&withraw_status, data, msg.account, msg.value);
                     if(withraw_status.error){
+                        // Widthraw error
                         sendResponse(data->fd, INSUFFICIENT, 0);
                         continue;
                     }
                     else{
+                        // Widthraw success
                         balance = withraw_status.balance;
                     }
                     break;
@@ -339,13 +348,18 @@ void * attentionThread(void * arg) {
                     fatalError("Unknown code!");
             }
 
+            // If we got here no errors were raised: send OK with balance
             sendResponse(data->fd, OK, balance);
             printf("[INFO][%lu] Successful transaction! - Total: %i\n", pthread_self(), getTransactionsInThread(data));
         }
     }
+    // Inform client that the server is closing
     sendResponse(data->fd, BYE, 0);
+
+    // Free the struct used to pass massages onto the thread
     free(data);
-    printf("[INFO][%lu] Closing connection!\n", pthread_self());
+
+    printf("[INFO][%lu] Closing thread!\n", pthread_self());
     pthread_exit(NULL);
 }
 
@@ -372,15 +386,23 @@ int checkValidAccount(int account)
  */
 
 float getBalance(conenction_data_t* data, int account_num){
+    // Extract all the values so the code is more readable
     account_t* account = &(data->bank_data->account_array[account_num]);
     pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
     pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
     float value;
 
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
     pthread_mutex_lock(account_lock);
     pthread_mutex_lock(trans_lock);
+
+    // This just reads
     value = account->balance;
     data->bank_data->total_transactions++;
+
     pthread_mutex_unlock(trans_lock);
     pthread_mutex_unlock(account_lock);
 
@@ -388,13 +410,20 @@ float getBalance(conenction_data_t* data, int account_num){
 }
 
 float depositToAccount(conenction_data_t* data, int account_num, float amount){
+    // Extract all the values so the code is more readable
     account_t* account = &(data->bank_data->account_array[account_num]);
     pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
     pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
     float value;
 
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
     pthread_mutex_lock(account_lock);
     pthread_mutex_lock(trans_lock);
+
+    // This just adds 2 numbers
     account->balance += amount;
     value = account->balance;
     data->bank_data->total_transactions++;
@@ -405,12 +434,19 @@ float depositToAccount(conenction_data_t* data, int account_num, float amount){
 }
 
 void withrawFromAccount(with_status_t* status, conenction_data_t* data, int account_num, float amount){
+    // Extract all the values so the code is more readable
     account_t* account = &(data->bank_data->account_array[account_num]);
     pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
     pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
 
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
     pthread_mutex_lock(account_lock);
     pthread_mutex_lock(trans_lock);
+
+    // Make sure enough funds are available, act accordingly and report errors if raised
     if(account->balance >= amount){
         account->balance -= amount;
         data->bank_data->total_transactions++;
