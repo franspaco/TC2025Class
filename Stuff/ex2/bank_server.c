@@ -20,7 +20,6 @@
 #include <sys/poll.h>
 // Posix threads library
 #include <pthread.h>
-#include <errno.h>
 
 // Custom libraries
 #include "bank_codes.h"
@@ -46,8 +45,8 @@ void closeBank(bank_t * bank_data, locks_t * data_locks);
 float getBalance(conenction_data_t* data, int account_num);
 float depositToAccount(conenction_data_t* data, int account_num, float ammount);
 void withrawFromAccount(with_status_t* status, conenction_data_t* data, int account_num, float amount);
-int getTransactions(conenction_data_t* data);
-int getTransactions(pthread_mutex_t* data);
+int getTransactionsInThread(conenction_data_t* data);
+int getTransactions(bank_t* bank_data, pthread_mutex_t* trans_lock);
 void exitHandler(int signal);
 
 
@@ -119,7 +118,8 @@ void setupHandlers() {
  * SIGINT handler
  */
  void exitHandler(int signal){
-
+     // Set flag to true
+     exit_flag = 1;
  }
 
 
@@ -177,14 +177,16 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 		// Error when polling
         if (poll_response == -1)
         {
-            // Test if the error was caused by an interruption
-            if (errno == EINTR)
-            {
-                printf("Poll did not finish. The program was interrupted");
+            // SIGINT will trigger this
+            // errno is checked to make sure it was a signal that got us here and not an error
+            if(errno == EINTR && exit_flag){
+                printf("\n\n[ALERT] SERVER SHUTTING DOWN! - No longer listening.\n");
+                // An exit signal got us here, therefore we must break
+                break;
             }
-            else
-            {
-                fatalError("ERROR: poll");
+            else{
+                // Some other error got us here
+                fatalError("poll");
             }
         }
 		// Timeout finished without reading anything
@@ -192,7 +194,7 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 
             // The exit flag has been activated => stop listening for requests
             if(exit_flag){
-                printf("SERVER SHUTTING DOWN! - No longer listening.\n");
+                printf("\n\n[ALERT] SERVER SHUTTING DOWN! - No longer listening.\n");
                 break;
             }
             //printf("No response after %d seconds\n", timeout);
@@ -213,7 +215,7 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 				 
 				// Get the data from the client
 				inet_ntop(client_address.sin_family, &client_address.sin_addr, client_presentation, sizeof client_presentation);
-				printf("Received incomming connection from %s on port %d\n", client_presentation, client_address.sin_port);
+				printf("[INFO] Received incomming connection from %s on port %d\n", client_presentation, client_address.sin_port);
 
 				// Prepare the structure to send to the thread
 
@@ -235,6 +237,7 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
     }
 
     // Print the total number of transactions performed
+    printf("[INFO] Bank closed with: %i transactions.\n", getTransactions(bank_data, &(data_locks->transactions_mutex)));
 
 }
 
@@ -264,13 +267,11 @@ void * attentionThread(void * arg) {
         poll_result = poll(test_fds, 1, timeout);
         
         if (poll_result == -1) {
-            // SIGINT will trigger this, to return the current value we just need to break
-            // out of the while-loop
+            // SIGINT will trigger this
             // errno is checked to make sure it was a signal that got us here and not an error
-            if(errno == EINTR /*&& exit_flag*/){
+            if(errno == EINTR && exit_flag){
                 printf("POLL KILLED BY FLAG!\n");
-                //TODO: EXIT FLAG
-                // An exit signal got us here, therefore we must break to return pi
+                // An exit signal got us here, therefore we must break
                 break;
             }
             else{
@@ -291,14 +292,22 @@ void * attentionThread(void * arg) {
             inmsg_t msg;
             parseIncomming(&msg, buffer);
 
+            // Client exiting procedure
             if(msg.op == EXIT){
                 printf("[INFO][%lu] Client is leaving!\n", pthread_self());
                 break;
             }
 
+            // Make sure account is valid, throw error otherwise
             if(!checkValidAccount(msg.account)){
                 sendResponse(data->fd, NO_ACCOUNT, 0);
                 continue;
+            }
+
+            // Last resort exit flag
+            // In case it was activated during reading
+            if(exit_flag){
+                break;
             }
 
             switch(msg.op){
@@ -331,11 +340,12 @@ void * attentionThread(void * arg) {
             }
 
             sendResponse(data->fd, OK, balance);
-            printf("[INFO][%lu] Successful transaction!\n\tTotal: %i\n", pthread_self(), getTransactions(data));
+            printf("[INFO][%lu] Successful transaction! - Total: %i\n", pthread_self(), getTransactionsInThread(data));
         }
     }
     sendResponse(data->fd, BYE, 0);
     free(data);
+    printf("[INFO][%lu] Closing connection!\n", pthread_self());
     pthread_exit(NULL);
 }
 
@@ -343,7 +353,7 @@ void * attentionThread(void * arg) {
     Free all the memory used for the bank data
 */
 void closeBank(bank_t * bank_data, locks_t * data_locks) {
-    printf("DEBUG: Clearing the memory for the thread\n");
+    printf("[DEBUG] Clearing the memory for the thread\n");
     free(bank_data->account_array);
     free(data_locks->account_mutex);
 }
@@ -401,7 +411,7 @@ void withrawFromAccount(with_status_t* status, conenction_data_t* data, int acco
 
     pthread_mutex_lock(account_lock);
     pthread_mutex_lock(trans_lock);
-    if(account->balance > amount){
+    if(account->balance >= amount){
         account->balance -= amount;
         data->bank_data->total_transactions++;
         status->balance = account->balance;
@@ -418,16 +428,18 @@ void withrawFromAccount(with_status_t* status, conenction_data_t* data, int acco
 /**
  * Wrapper to get transactions from within the threads
  */
-int getTransactions(conenction_data_t* data){
-    pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
-    int value;
-    pthread_mutex_lock(trans_lock);
-    value = data->bank_data->total_transactions;
-    pthread_mutex_unlock(trans_lock);
-    return value;
+int getTransactionsInThread(conenction_data_t* data){
+    return getTransactions(data->bank_data, &(data->data_locks->transactions_mutex));
 }
 
-int getTransactions(pthread_mutex_t* data){
-
+/**
+ * Gets Transactions
+ */
+int getTransactions(bank_t* bank_data, pthread_mutex_t* trans_lock){
+    int value;
+    pthread_mutex_lock(trans_lock);
+    value = bank_data->total_transactions;
+    pthread_mutex_unlock(trans_lock);
+    return value;
 }
 

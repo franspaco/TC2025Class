@@ -154,6 +154,7 @@ void bankOperations(int connection_fd)
                 break;
             case BYE:
                 printf("\tThanks for connecting to the bank. Good bye!\n");
+                exit(0);
                 break;
             case ERROR: default:
                 printf("\tInvalid operation. Try again\n");
