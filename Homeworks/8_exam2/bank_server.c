@@ -1,3 +1,8 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ */
+
 /*
     Program for a simple bank server
     It uses sockets and threads
@@ -26,43 +31,9 @@
 #include "sockets.h"
 #include "fatal_error.h"
 
-#define NUM_ACCOUNTS 4
-#define BUFFER_SIZE 1024
-#define MAX_QUEUE 5
-
-///// Structure definitions
-
-// Data for a single bank account
-typedef struct account_struct {
-    int id;
-    float balance;
-} account_t;
-
-// Data for the bank operations
-typedef struct bank_struct {
-    // Store the total number of operations performed
-    int total_transactions;
-    // An array of the accounts
-    account_t * account_array;
-} bank_t;
-
-// Structure for the mutexes to keep the data consistent
-typedef struct locks_struct {
-    // Mutex for the number of transactions variable
-    pthread_mutex_t transactions_mutex;
-    // Mutex array for the operations on the accounts
-    pthread_mutex_t * account_mutex;
-} locks_t;
-
-// Data that will be sent to each structure
-typedef struct data_struct {
-    // The file descriptor for the socket
-    int connection_fd;
-    // A pointer to a bank data structure
-    bank_t * bank_data;
-    // A pointer to a locks structure
-    locks_t * data_locks;
-} thread_data_t;
+// Custom^2 Libraries
+#include "server_utils.h"
+#include "server_definitions.h"
 
 
 
@@ -74,9 +45,18 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 void * attentionThread(void * arg);
 int checkValidAccount(int account);
 void closeBank(bank_t * bank_data, locks_t * data_locks);
-/*
-    EXAM: Add your function declarations here
-*/
+
+// Custom functions
+float getBalance(conenction_data_t* data, int account_num);
+float depositToAccount(conenction_data_t* data, int account_num, float ammount);
+void withrawFromAccount(with_status_t* status, conenction_data_t* data, int account_num, float amount);
+int getTransactionsInThread(conenction_data_t* data);
+int getTransactions(bank_t* bank_data, pthread_mutex_t* trans_lock);
+void exitHandler(int signal);
+
+
+// Global vars
+int exit_flag = 0;
 
 
 
@@ -134,11 +114,18 @@ void usage(char * program)
 /*
     Modify the signal handlers for specific events
 */
-void setupHandlers()
-{
-
+void setupHandlers() {
+    signal(SIGINT, exitHandler);
 }
 
+
+/**
+ * SIGINT handler
+ */
+ void exitHandler(int signal){
+     // Set flag to true
+     exit_flag = 1;
+ }
 
 
 /*
@@ -175,9 +162,8 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
     char client_presentation[INET_ADDRSTRLEN];
     int client_fd;
     pthread_t new_tid;
-    thread_data_t * connection_data = NULL;
     int poll_response;
-	int timeout = 500;		// Time in milliseconds (0.5 seconds)
+	int timeout = 100;		// Time in milliseconds (0.5 seconds)
 
     // Get the size of the structure to store client information
     client_address_size = sizeof client_address;
@@ -196,19 +182,26 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 		// Error when polling
         if (poll_response == -1)
         {
-            // Test if the error was caused by an interruption
-            if (errno == EINTR)
-            {
-                printf("Poll did not finish. The program was interrupted");
+            // SIGINT will trigger this
+            // errno is checked to make sure it was a signal that got us here and not an error
+            if(errno == EINTR && exit_flag){
+                printf("\n\n[ALERT] SERVER SHUTTING DOWN! - No longer listening.\n");
+                // An exit signal got us here, therefore we must break
+                break;
             }
-            else
-            {
-                fatalError("ERROR: poll");
+            else{
+                // Some other error got us here
+                fatalError("poll");
             }
         }
 		// Timeout finished without reading anything
-        else if (poll_response == 0)
-        {
+        else if (poll_response == 0){
+
+            // The exit flag has been activated => stop listening for requests
+            if(exit_flag){
+                printf("\n\n[ALERT] SERVER SHUTTING DOWN! - No longer listening.\n");
+                break;
+            }
             //printf("No response after %d seconds\n", timeout);
         }
 		// There is something ready at the socket
@@ -227,46 +220,161 @@ void waitForConnections(int server_fd, bank_t * bank_data, locks_t * data_locks)
 				 
 				// Get the data from the client
 				inet_ntop(client_address.sin_family, &client_address.sin_addr, client_presentation, sizeof client_presentation);
-				printf("Received incomming connection from %s on port %d\n", client_presentation, client_address.sin_port);
+				printf("[INFO] Received incomming connection from %s on port %d\n", client_presentation, client_address.sin_port);
 
 				// Prepare the structure to send to the thread
 
 				// CREATE A THREAD
-
+                conenction_data_t* temp_data = malloc(sizeof(conenction_data_t));
+                temp_data->bank_data = bank_data;
+                temp_data->data_locks = data_locks;
+                temp_data->fd = client_fd;
+                int status;
+                status = pthread_create(&new_tid, NULL, attentionThread, (void*) temp_data);
+                if( status != 0){
+                    printf("[ERROR] Failed to create handler!\n");
+                }
+                else{
+                    printf("[INFO] Created thread %lu for request.\n", new_tid);
+                }
             }
         }
     }
 
     // Print the total number of transactions performed
+    printf("[INFO] Bank closed with: %i transactions.\n", getTransactions(bank_data, &(data_locks->transactions_mutex)));
 
 }
 
 /*
     Hear the request from the client and send an answer
 */
-void * attentionThread(void * arg)
-{
-    // Receive the data for the bank, mutexes and socket file descriptor
+void * attentionThread(void * arg) {
+    conenction_data_t* data = (conenction_data_t*) arg;
+    printf("[INFO][%lu] Attending request!\n", pthread_self());
 
-    // Loop to listen for messages from the client
+    // Stuff required by poll
+    struct pollfd test_fds[1];
+    int timeout = 10; // 10ms tiemout
+    int poll_result;
 
-        // Receive the request
+    // buffer
+    char buffer[BUFFER_SIZE];
 
-        // Process the request being careful of data consistency
+    //Account stuff
+    float balance = 0;
+    with_status_t withraw_status;
 
-        // Update the number of transactions
+    while (!exit_flag) {
+        // POLL
+        // Fill in the data for the structure
+        test_fds[0].fd = data->fd;
+        test_fds[0].events = POLLIN;
+        // Call poll
+        poll_result = poll(test_fds, 1, timeout);
+        
+        if (poll_result == -1) {
+            // SIGINT will trigger this
+            // errno is checked to make sure it was a signal that got us here and not an error
+            if(errno == EINTR && exit_flag){
+                printf("POLL KILLED BY FLAG!\n");
+                // An exit signal got us here, therefore we must break
+                break;
+            }
+            else{
+                // Some other error got us here
+                fatalError("poll");
+            }
+        }
+        else if (poll_result == 0){
+            // Nothing
+        }
+        else {
+            // Got a message
+            if(recvString(data->fd, buffer, BUFFER_SIZE) == 0){
+                printf("[INFO][%lu] Client disconnected!\n", pthread_self());
+                break;
+            }
+            //printf("[INFO][%lu] Got text: %s\n",pthread_self(), buffer);
+            inmsg_t msg;
+            parseIncomming(&msg, buffer);
 
-        // Send a reply
+            // Client exiting procedure
+            if(msg.op == EXIT){
+                printf("[INFO][%lu] Client is leaving!\n", pthread_self());
+                break;
+            }
 
+            // Make sure account is valid, throw error otherwise
+            if(!checkValidAccount(msg.account)){
+                sendResponse(data->fd, NO_ACCOUNT, 0);
+                continue;
+            }
+
+            // Last resort exit flag
+            // In case it was activated during reading
+            // Only happens in very intense workloads
+            // (Like my testing metodology described in the README)
+            if(exit_flag){
+                break;
+            }
+
+            switch(msg.op){
+                case CHECK:
+                    // Get balance
+                    balance = getBalance(data, msg.account);
+                    break;
+                case DEPOSIT:
+                    // Make sure value is valid
+                    if(msg.value < 0){
+                        sendResponse(data->fd, ERROR, 0);
+                        continue;
+                    }
+                    // Make deposit
+                    balance = depositToAccount(data, msg.account, msg.value);
+                    break;
+                case WITHDRAW:
+                    // Make sure value is valid
+                    if(msg.value < 0){
+                        sendResponse(data->fd, ERROR, 0);
+                        continue;
+                    }
+                    // Try widthraw
+                    withrawFromAccount(&withraw_status, data, msg.account, msg.value);
+                    if(withraw_status.error){
+                        // Widthraw error
+                        sendResponse(data->fd, INSUFFICIENT, 0);
+                        continue;
+                    }
+                    else{
+                        // Widthraw success
+                        balance = withraw_status.balance;
+                    }
+                    break;
+                default:
+                    fatalError("Unknown code!");
+            }
+
+            // If we got here no errors were raised: send OK with balance
+            sendResponse(data->fd, OK, balance);
+            printf("[INFO][%lu] Successful transaction! - Total: %i\n", pthread_self(), getTransactionsInThread(data));
+        }
+    }
+    // Inform client that the server is closing
+    sendResponse(data->fd, BYE, 0);
+
+    // Free the struct used to pass massages onto the thread
+    free(data);
+
+    printf("[INFO][%lu] Closing thread!\n", pthread_self());
     pthread_exit(NULL);
 }
 
 /*
     Free all the memory used for the bank data
 */
-void closeBank(bank_t * bank_data, locks_t * data_locks)
-{
-    printf("DEBUG: Clearing the memory for the thread\n");
+void closeBank(bank_t * bank_data, locks_t * data_locks) {
+    printf("[DEBUG] Clearing the memory for the thread\n");
     free(bank_data->account_array);
     free(data_locks->account_mutex);
 }
@@ -279,3 +387,102 @@ int checkValidAccount(int account)
 {
     return (account >= 0 && account < NUM_ACCOUNTS);
 }
+
+/**
+ * Custom functions
+ */
+
+float getBalance(conenction_data_t* data, int account_num){
+    // Extract all the values so the code is more readable
+    account_t* account = &(data->bank_data->account_array[account_num]);
+    pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
+    pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
+    float value;
+
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
+    pthread_mutex_lock(account_lock);
+    pthread_mutex_lock(trans_lock);
+
+    // This just reads
+    value = account->balance;
+    data->bank_data->total_transactions++;
+
+    pthread_mutex_unlock(trans_lock);
+    pthread_mutex_unlock(account_lock);
+
+    return value;
+}
+
+float depositToAccount(conenction_data_t* data, int account_num, float amount){
+    // Extract all the values so the code is more readable
+    account_t* account = &(data->bank_data->account_array[account_num]);
+    pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
+    pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
+    float value;
+
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
+    pthread_mutex_lock(account_lock);
+    pthread_mutex_lock(trans_lock);
+
+    // This just adds 2 numbers
+    account->balance += amount;
+    value = account->balance;
+    data->bank_data->total_transactions++;
+    pthread_mutex_unlock(trans_lock);
+    pthread_mutex_unlock(account_lock);
+
+    return value;
+}
+
+void withrawFromAccount(with_status_t* status, conenction_data_t* data, int account_num, float amount){
+    // Extract all the values so the code is more readable
+    account_t* account = &(data->bank_data->account_array[account_num]);
+    pthread_mutex_t* account_lock = &(data->data_locks->account_mutex[account_num]);
+    pthread_mutex_t* trans_lock = &(data->data_locks->transactions_mutex);
+
+    // Locks account first and transactions second
+    // Does everything that's required 
+    // Unlocks transactions first and account second
+    // This order is meant to avoid deadlocks
+    pthread_mutex_lock(account_lock);
+    pthread_mutex_lock(trans_lock);
+
+    // Make sure enough funds are available, act accordingly and report errors if raised
+    if(account->balance >= amount){
+        account->balance -= amount;
+        data->bank_data->total_transactions++;
+        status->balance = account->balance;
+        status->error = 0;
+    }
+    else{
+        status->balance = 0;
+        status->error = 1;
+    }
+    pthread_mutex_unlock(trans_lock);
+    pthread_mutex_unlock(account_lock);
+}
+
+/**
+ * Wrapper to get transactions from within the threads
+ */
+int getTransactionsInThread(conenction_data_t* data){
+    return getTransactions(data->bank_data, &(data->data_locks->transactions_mutex));
+}
+
+/**
+ * Gets Transactions
+ */
+int getTransactions(bank_t* bank_data, pthread_mutex_t* trans_lock){
+    int value;
+    pthread_mutex_lock(trans_lock);
+    value = bank_data->total_transactions;
+    pthread_mutex_unlock(trans_lock);
+    return value;
+}
+

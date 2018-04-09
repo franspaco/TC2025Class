@@ -3,9 +3,9 @@
 ### Variables for this project ###
 # These should be the only ones that need to be modified
 # The files that must be compiled, with a .o extension
-OBJECTS = fatal_error.o sockets.o
+OBJECTS = fatal_error.o sockets.o server_utils.o
 # The header files
-DEPENDS = fatal_error.h sockets.h bank_codes.h
+DEPENDS = fatal_error.h sockets.h bank_codes.h server_utils.h server_definitions.h
 # The executable programs to be created
 CLIENT = bank_client
 #CLIENT = pi_client
@@ -31,7 +31,7 @@ LDLIBS = -lpthread
 #   $<  = The first required file of the rule
 
 # Default rule
-all: $(CLIENT) $(SERVER) $(TEST)
+all: clean $(CLIENT) $(SERVER) $(TEST)
 
 # Rule to make the client program
 $(CLIENT): $(CLIENT).o $(OBJECTS)

@@ -14,6 +14,8 @@
 // Sockets libraries
 #include <netdb.h>
 #include <arpa/inet.h>
+// poll
+#include <sys/poll.h>
 // Custom libraries
 #include "bank_codes.h"
 #include "sockets.h"
@@ -73,15 +75,63 @@ void bankOperations(int connection_fd)
     int status;
     operation_t operation;
 
-    while (option != 'x')
-    {
+    // Stuff required by poll stdin
+    struct pollfd test_fds[1];
+    int timeout = 10; // 10ms tiemout
+    int poll_result;
+
+    while (option != 'x'){
         printf("Bank menu:\n");
         printf("\tc. Check balance\n");
         printf("\td. Deposit into account\n");
         printf("\tw. Withdraw from account\n");
         printf("\tx. Exit program\n");
-        printf("Select an option: ");
-        scanf(" %c", &option);
+        printf("Select an option: \n");
+
+        // So I wasn't happy that there was no way for the client to know the server had shut down,
+        // therefore I made this double poll extravaganza that handles that case.
+        // Polls both stdin and the socket and will end the client if the server went off.
+        while(1){
+            test_fds[0].fd = stdin->_fileno;
+            test_fds[0].events = POLLIN;
+            poll_result = poll(test_fds, 1, timeout);
+            if(poll_result == -1){
+                //??
+                fatalError("STDIN poll");
+            }
+            else if(poll_result == 0){
+                // Nothing: check for server replies
+                test_fds[0].fd = connection_fd;
+                test_fds[0].events = POLLIN;
+                poll_result = poll(test_fds, 1, timeout);
+                if(poll_result == -1){
+                    //??
+                    fatalError("Server poll");
+                }
+                else if(poll_result == 0){
+                    // Nothing: continue polling
+                    continue;
+                }
+                else{
+                    // Got something, most likely a BYE: read and make sure
+                    // Receive the response
+                    if ( !recvString(connection_fd, buffer, BUFFER_SIZE) ){
+                        printf("\n\nServer closed the connection\n");
+                        exit(0);
+                    }
+                    // Extract the data
+                    sscanf(buffer, "%d %f", &status, &balance);
+                    if(status == BYE){
+                        printf("\n\nServer is shutting down! BYE\n");
+                        exit(0);
+                    }
+                }
+            }
+            else{
+                scanf(" %c", &option);
+                break;
+            }
+        }
 
         // Init variables to default values
         account = 0;
@@ -108,7 +158,7 @@ void bankOperations(int connection_fd)
             case 'w':
                 printf("Enter account: ");
                 scanf("%d", &account);
-                printf("Enter the amount to deposit: ");
+                printf("Enter the amount to withdraw: ");
                 scanf("%f", &amount);
                 operation = WITHDRAW;
                 break;
@@ -154,7 +204,13 @@ void bankOperations(int connection_fd)
                 printf("\tInvalid acount number entered\n");
                 break;
             case BYE:
-                printf("\tThanks for connecting to the bank. Good bye!\n");
+                if(option == 'x'){
+                    printf("\tThanks for connecting to the bank. Good bye!\n");
+                }
+                else{
+                    printf("\n\nThe server closed before the action could be performed.\nBalance was not affected!\n");
+                }
+                exit(0);
                 break;
             case ERROR: default:
                 printf("\tInvalid operation. Try again\n");
