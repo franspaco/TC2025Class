@@ -1,6 +1,9 @@
 {
     "files.associations": {
-        "fatal_error.h": "c"
-    },
-    "python.pythonPath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\Python36_64\\python.exe"
+        "fatal_error.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "signal.h": "c",
+        "unistd.h": "c"
+    }
 }
