@@ -1,14 +1,13 @@
 
-build
-build/
 build/*
+!build/README.md
 
 
 .vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/c_cpp_properties.json
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/c_cpp_properties.json
 .vscode/settings.json
 .vscode/c_cpp_properties.json
