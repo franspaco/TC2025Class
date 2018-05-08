@@ -1,6 +1,7 @@
 
 build/*
 !build/README.md
+!build/frames/README.md
 
 
 .vscode/*
