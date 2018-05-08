@@ -68,6 +68,7 @@ void print_board(board_t* board){
     }
 }
 
+
 int manage_overflows(int max, int val){
     // val is within range
     if( val >= 0 && val < max){
@@ -75,10 +76,7 @@ int manage_overflows(int max, int val){
     }
     // val is negative overflowed
     else if ( val < 0 ){
-        while(val < 0){
-            val += max;
-        }
-        return val;
+        return val + max;
     }
     // val is positive overflowed
     else {
@@ -94,13 +92,22 @@ int get_value(board_t* board, int x, int y){
 
 int count_live_neughbours(board_t* board, int x, int y){
     int count = 0;
-    for (int i = -1; i < 2; i++){
-        for (int j = -1; j < 2; j++){
-            if (i == 0 && j == 0)
-                continue;
-            count += (get_value(board, x + i, y + j) == ALIVE) ? 1 : 0;
-        }
-    }
+    if(get_value(board, y - 1, x - 1) == ALIVE)
+        count++;
+    if(get_value(board, y - 1, x    ) == ALIVE)
+        count++;
+    if(get_value(board, y - 1, x + 1) == ALIVE)
+        count++;
+    if(get_value(board, y    , x - 1) == ALIVE)
+        count++;
+    if(get_value(board, y    , x + 1) == ALIVE)
+        count++;
+    if(get_value(board, y + 1, x - 1) == ALIVE)
+        count++;
+    if(get_value(board, y + 1, x    ) == ALIVE)
+        count++;
+    if(get_value(board, y + 1, x + 1) == ALIVE)
+        count++;
     return count;
 }
 
@@ -190,9 +197,10 @@ void simulation(board_t* last, board_t* current){
 }
 #elif SIM_MODE==2
 void simulation(board_t* last, board_t* current){
-    #pragma omp parallel for default(none) shared(last, current)
-    for (int y = 0; y < current->Y; y++){
-        for (int x = 0; x < current->X; x++){
+    int y, x;
+    #pragma omp parallel for default(none) shared(last, current) private(y, x)
+    for (y = 0; y < current->Y; y++){
+        for (x = 0; x < current->X; x++){
             current->cells[y][x] = get_next_status(last, x, y);
         }
     }
