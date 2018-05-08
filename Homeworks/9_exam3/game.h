@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <time.h>
+#include <omp.h>
 
 // Board struct
 typedef struct board_struct {

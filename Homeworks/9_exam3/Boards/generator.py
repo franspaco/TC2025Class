@@ -1,8 +1,8 @@
 
 import sys, random
 
-X = 1920
-Y = 1080
+X = 2440
+Y = 2440
 
 live_per = 15
 

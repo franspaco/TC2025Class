@@ -190,9 +190,10 @@ void simulation(board_t* last, board_t* current){
 }
 #elif SIM_MODE==2
 void simulation(board_t* last, board_t* current){
-    for (int i = 0; i < current->Y; i++){
-        for (int j = 0; j < current->X; j++){
-            current->cells[i][j] = get_next_status(last, i, j);
+    #pragma omp parallel for default(none) shared(last, current)
+    for (int y = 0; y < current->Y; y++){
+        for (int x = 0; x < current->X; x++){
+            current->cells[y][x] = get_next_status(last, x, y);
         }
     }
 }
