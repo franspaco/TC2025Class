@@ -106,7 +106,7 @@ void lifeSimulation(int iterations, char * start_file) {
 // Save the contents of the board as a PGM image
 void saveAsPNG(const board_t * board, int iteration) {
     char buffer[50];
-    sprintf(buffer, "frames/frame_%03i.png", iteration);
+    sprintf(buffer, "frames/frame_%04i.png", iteration);
     // Initialize file and Tiny Png Output
     FILE* fout = fopen(buffer, "wb");
     struct TinyPngOut pngout;

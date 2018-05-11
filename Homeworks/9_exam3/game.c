@@ -39,7 +39,7 @@ board_t* board_from_file(char* filename){
     int buffer = 0;
     for (int i = 0; i < sizey; i++){
         for (int j = 0; j < sizex; j++){
-            fscanf(file, "%i ", &buffer);
+            fscanf(file, "%i", &buffer);
             // Translate 1's into Cell State enum
             board->cells[i][j] = (buffer==1)? ALIVE : EMPTY;
         }
@@ -92,21 +92,21 @@ int get_value(board_t* board, int x, int y){
 
 int count_live_neughbours(board_t* board, int x, int y){
     int count = 0;
-    if(get_value(board, y - 1, x - 1) == ALIVE)
+    if(get_value(board, x - 1, y - 1) == ALIVE)
         count++;
-    if(get_value(board, y - 1, x    ) == ALIVE)
+    if(get_value(board, x - 1, y    ) == ALIVE)
         count++;
-    if(get_value(board, y - 1, x + 1) == ALIVE)
+    if(get_value(board, x - 1, y + 1) == ALIVE)
         count++;
-    if(get_value(board, y    , x - 1) == ALIVE)
+    if(get_value(board, x    , y - 1) == ALIVE)
         count++;
-    if(get_value(board, y    , x + 1) == ALIVE)
+    if(get_value(board, x    , y + 1) == ALIVE)
         count++;
-    if(get_value(board, y + 1, x - 1) == ALIVE)
+    if(get_value(board, x + 1, y - 1) == ALIVE)
         count++;
-    if(get_value(board, y + 1, x    ) == ALIVE)
+    if(get_value(board, x + 1, y    ) == ALIVE)
         count++;
-    if(get_value(board, y + 1, x + 1) == ALIVE)
+    if(get_value(board, x + 1, y + 1) == ALIVE)
         count++;
     return count;
 }
@@ -149,12 +149,11 @@ typedef struct thread_data{
 #ifdef SIM_MODE
 #if SIM_MODE==1
 
-#define MAX_THREADS 2
+#define MAX_THREADS 1
 
 void* thread_calculate_rows(void* args){
     data_t* data = (data_t*)args;
-    printf("Doing: %i -> %i %ix%i\n", data->row_init, data->row_end, data->row_end-data->row_init, data->current->X);
-    clock_t t = clock();
+    //printf("Doing: %i -> %i %ix%i\n", data->row_init, data->row_end, data->row_end-data->row_init, data->current->X);
     int count = 0;
     for (int y = data->row_init; y < data->row_end; y++){
         for (int x = 0; x < (data->current->X); x++){
@@ -162,8 +161,7 @@ void* thread_calculate_rows(void* args){
             count++;
         }
     }
-    printf("Assert: %i == %i\n", (data->row_end-data->row_init)*(data->current->X), count);
-    printf("Took: %fs\n", (double)(clock()-t)/CLOCKS_PER_SEC);
+    //printf("Assert: %i == %i\n", (data->row_end-data->row_init)*(data->current->X), count);
     free(data);
     pthread_exit(0);
 }
@@ -183,15 +181,15 @@ void simulation(board_t* last, board_t* current){
 
     if(rowspth != 0){
         for(int t = 0; t < MAX_THREADS-1; t++){
-            printf("Launch %i -> %i\n", t*rowspth, (t+1)*rowspth);
+            //printf("Launch %i -> %i\n", t*rowspth, (t+1)*rowspth);
             make_thread(last, current, &tids[t], t*rowspth, (t+1)*rowspth);
         }
     }
-    printf("Launch %i -> %i\n", (MAX_THREADS-1)*rowspth, current->Y);
+    //printf("Launch %i -> %i\n", (MAX_THREADS-1)*rowspth, current->Y);
     make_thread(last, current, &tids[MAX_THREADS-1], (MAX_THREADS-1)*rowspth, current->Y);
     for(int y = 0; y < MAX_THREADS; y++){
         pthread_join(tids[y], NULL);
-        printf("Join\n");
+        //printf("Join\n");
     }
     free(tids);
 }
