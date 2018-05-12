@@ -1,7 +1,13 @@
+/**
+ * Francisco Huelsz Prince
+ * A01019512
+ */
 
 #include "game.h"
 
-
+/**
+ * Create and allocate board
+ */
 board_t* create_board(int sizex, int sizey){
     board_t* board = malloc(sizeof(board_t));
     board->X = sizex;
@@ -18,12 +24,18 @@ board_t* create_board(int sizex, int sizey){
     return board;
 }
 
+/**
+ * Destroy board
+ */
 void destroy_board(board_t* board){
     free(board->cells[0]);
     free(board->cells);
     free(board);
 }
 
+/**
+ * Reads board from file
+ */
 board_t* board_from_file(char* filename){
     int sizex = 0, sizey = 0;
     FILE* file = fopen(filename, "r");
@@ -48,6 +60,9 @@ board_t* board_from_file(char* filename){
     return board;
 }
 
+/**
+ * Turns codes into prettier characters
+ */
 char encode(int val){
     switch(val){
         case EMPTY:
@@ -59,6 +74,9 @@ char encode(int val){
     }
 }
 
+/**
+ * Prints a board
+ */
 void print_board(board_t* board){
     for (int i = 0; i < board->Y; i++){
         for (int j = 0; j < board->X; j++){
@@ -68,7 +86,9 @@ void print_board(board_t* board){
     }
 }
 
-
+/**
+ * Normalizes a value into a range declared as [0,max)
+ */
 int manage_overflows(int max, int val){
     // val is within range
     if( val >= 0 && val < max){
@@ -84,12 +104,19 @@ int manage_overflows(int max, int val){
     }
 }
 
+/**
+ * Retrieves the value of a cell
+ */
 int get_value(board_t* board, int x, int y){
+    // Normalize x and y
     x = manage_overflows(board->X, x);
     y = manage_overflows(board->Y, y);
     return board->cells[y][x];
 }
 
+/**
+ * Counts live neighbours
+ */
 int count_live_neughbours(board_t* board, int x, int y){
     int count = 0;
     if(get_value(board, x - 1, y - 1) == ALIVE)
@@ -117,9 +144,11 @@ int get_next_status(board_t* board, int x, int y){
     // Cell was dead in last frame
     if (status == EMPTY || status == DEAD){
         if (neighbours == 3){
+            // Cell is now alive
             return ALIVE;
         }
         else {
+            // Cell state remains the same
             return status;
         }
     }
@@ -136,6 +165,9 @@ int get_next_status(board_t* board, int x, int y){
     }
 }
 
+/**
+ * Struct for passing data to threads
+ */
 typedef struct thread_data{
     board_t* last;
     board_t* current;
@@ -146,26 +178,37 @@ typedef struct thread_data{
 
 //#define SIM_MODE 1
 
+/**
+ * SIMULATION FUNCTION!!
+ * 
+ * Has 3 implementarions.
+ * 
+ * The implementation is selected based on flags.
+ * 
+ * Cmake takes care of this
+ * 
+ */
+
 #ifdef SIM_MODE
 #if SIM_MODE==1
 
-#define MAX_THREADS 1
+// THREADED MODE
+#define MAX_THREADS 4
 
+// Thread function, calculates rows in a range specified in data
 void* thread_calculate_rows(void* args){
     data_t* data = (data_t*)args;
-    //printf("Doing: %i -> %i %ix%i\n", data->row_init, data->row_end, data->row_end-data->row_init, data->current->X);
-    int count = 0;
+    // Do all rows from row_init up until before row_end
     for (int y = data->row_init; y < data->row_end; y++){
         for (int x = 0; x < (data->current->X); x++){
             data->current->cells[y][x] = get_next_status(data->last, x, y);
-            count++;
         }
     }
-    //printf("Assert: %i == %i\n", (data->row_end-data->row_init)*(data->current->X), count);
     free(data);
     pthread_exit(0);
 }
 
+// Helper function to generate threads
 void make_thread(board_t* last, board_t* current, pthread_t* tid, int y_min, int y_max){
     data_t* data = malloc(sizeof(data_t));
     data->last = last;
@@ -174,28 +217,29 @@ void make_thread(board_t* last, board_t* current, pthread_t* tid, int y_min, int
     data->row_end = y_max;
     pthread_create(tid, NULL, thread_calculate_rows, (void*)data);
 }
+// Main simulation function. Threaded implementation divides the rows between all the threads.
 void simulation(board_t* last, board_t* current){
     pthread_t* tids = malloc(MAX_THREADS * sizeof(pthread_t));
-    pthread_t extra_thread;
     int rowspth = (current->Y) / MAX_THREADS;
 
     if(rowspth != 0){
         for(int t = 0; t < MAX_THREADS-1; t++){
-            //printf("Launch %i -> %i\n", t*rowspth, (t+1)*rowspth);
             make_thread(last, current, &tids[t], t*rowspth, (t+1)*rowspth);
         }
     }
-    //printf("Launch %i -> %i\n", (MAX_THREADS-1)*rowspth, current->Y);
+    // Make a last thread with the residual of the division # of lines. When the # of lines < # of threads, only this thread works.
     make_thread(last, current, &tids[MAX_THREADS-1], (MAX_THREADS-1)*rowspth, current->Y);
     for(int y = 0; y < MAX_THREADS; y++){
         pthread_join(tids[y], NULL);
-        //printf("Join\n");
     }
     free(tids);
 }
 #elif SIM_MODE==2
+// OPEN MP MODE
 void simulation(board_t* last, board_t* current){
     int y, x;
+    // Only one pragma since I realized nested pragmas made it slower in this case
+    // It is basically the same as the linear but adding a pragma omp
     #pragma omp parallel for default(none) shared(last, current) private(y, x)
     for (y = 0; y < current->Y; y++){
         for (x = 0; x < current->X; x++){
@@ -205,7 +249,9 @@ void simulation(board_t* last, board_t* current){
 }
 #endif
 #else
+// LINEAR MODE
 void simulation(board_t* last, board_t* current){
+    // Iterate over everything and set it to the new status.
     for (int y = 0; y < current->Y; y++){
         for (int x = 0; x < current->X; x++){
             current->cells[y][x] = get_next_status(last, x, y);

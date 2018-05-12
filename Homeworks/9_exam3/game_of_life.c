@@ -77,7 +77,6 @@ void lifeSimulation(int iterations, char * start_file) {
     double avg_sim_time = 0;
 
     for (int i = 0; i < iterations; i++) {
-        //printf("It: %03i\n", i);
 
         // Save last to file
         t = clock();
@@ -88,7 +87,7 @@ void lifeSimulation(int iterations, char * start_file) {
         // Create new board
         board_t* current = create_board(last->X, last->Y);
 
-        // Simulate
+        // Simulate from last into current
         t = clock();
         simulation(last, current);
         avg_sim_time += (double)(clock()-t)/CLOCKS_PER_SEC;
@@ -103,7 +102,7 @@ void lifeSimulation(int iterations, char * start_file) {
     printf("\n");
 }
 
-// Save the contents of the board as a PGM image
+// Save the contents of the board as a PNG image
 void saveAsPNG(const board_t * board, int iteration) {
     char buffer[50];
     sprintf(buffer, "frames/frame_%04i.png", iteration);
@@ -118,9 +117,13 @@ void saveAsPNG(const board_t * board, int iteration) {
     // Once file is ok format the data:
     int full_size = (board->X) * (board->Y);
     int pixels_total = full_size * 3;
+    // Alloc memory for the RGB pixels
     uint8_t* pixels = malloc(pixels_total*sizeof(uint8_t));
+    // Create color component variables.
     uint8_t R = 255, G = 255, B = 255;
+    // Convert the board into an image
     for(int i = 0; i < full_size; i++){
+        // Select the correct color values
         switch (board->cells[0][i]){
             case EMPTY:
                 R = 255;
@@ -138,6 +141,7 @@ void saveAsPNG(const board_t * board, int iteration) {
                 B = 0;
                 break;
         }
+        // Save the pixel
         pixels[i*3 + 0] = R;
         pixels[i*3 + 1] = G;
         pixels[i*3 + 2] = B;
@@ -153,6 +157,8 @@ void saveAsPNG(const board_t * board, int iteration) {
         // Error
         exit(3);
     }
+    // CLose image file
 	fclose(fout);
+    // Free pixels array
     free(pixels);
 }
